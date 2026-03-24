@@ -94,10 +94,9 @@ namespace fusionc::frontend::parser
     std::string returnType;
     std::string functionName;
 
-    // CustomLang style: fn main() { ... }
     if (match(lexer::TokenType::Keyword, "fn"))
     {
-      returnType = "int"; // default return type for now
+      returnType = "int";
 
       if (!match(lexer::TokenType::Identifier))
       {
@@ -107,7 +106,6 @@ namespace fusionc::frontend::parser
 
       functionName = previous().lexeme;
     }
-    // C style: int main() { ... }
     else if (check(lexer::TokenType::Keyword))
     {
       const auto typeToken = advance();
@@ -340,16 +338,50 @@ namespace fusionc::frontend::parser
 
   std::unique_ptr<AstNode> Parser::parseExpression()
   {
-    auto left = parseTerm();
+    auto parseAdditive = [&]() -> std::unique_ptr<AstNode>
+    {
+      auto left = parseTerm();
+      if (!left)
+      {
+        return nullptr;
+      }
+
+      while (match(lexer::TokenType::Operator, "+") || match(lexer::TokenType::Operator, "-"))
+      {
+        const std::string op = previous().lexeme;
+        auto right = parseTerm();
+        if (!right)
+        {
+          addError("Expected expression after operator '" + op + "'.");
+          return nullptr;
+        }
+
+        auto binary = std::make_unique<AstNode>();
+        binary->kind = AstNodeKind::BinaryExpression;
+        binary->value = op;
+        binary->children.push_back(std::move(left));
+        binary->children.push_back(std::move(right));
+        left = std::move(binary);
+      }
+
+      return left;
+    };
+
+    auto left = parseAdditive();
     if (!left)
     {
       return nullptr;
     }
 
-    while (match(lexer::TokenType::Operator, "+") || match(lexer::TokenType::Operator, "-"))
+    while (match(lexer::TokenType::Operator, "<") ||
+           match(lexer::TokenType::Operator, ">") ||
+           match(lexer::TokenType::Operator, "<=") ||
+           match(lexer::TokenType::Operator, ">=") ||
+           match(lexer::TokenType::Operator, "==") ||
+           match(lexer::TokenType::Operator, "!="))
     {
       const std::string op = previous().lexeme;
-      auto right = parseTerm();
+      auto right = parseAdditive();
       if (!right)
       {
         addError("Expected expression after operator '" + op + "'.");

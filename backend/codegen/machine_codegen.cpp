@@ -1,7 +1,7 @@
 #include "machine_codegen.h"
 
-#include <unordered_map>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace fusionc::backend::codegen
 {
@@ -13,7 +13,6 @@ namespace fusionc::backend::codegen
 
     ExecutionResult result;
 
-    // First pass: collect labels
     for (std::size_t i = 0; i < program.size(); ++i)
     {
       if (program[i].op == "label")
@@ -32,7 +31,6 @@ namespace fusionc::backend::codegen
       return std::stoi(name);
     };
 
-    // Execution with program counter
     for (std::size_t pc = 0; pc < program.size(); ++pc)
     {
       const auto &ins = program[pc];
@@ -64,6 +62,30 @@ namespace fusionc::backend::codegen
       else if (ins.op == "div")
       {
         slots[ins.dst] = read(ins.arg1) / read(ins.arg2);
+      }
+      else if (ins.op == "lt")
+      {
+        slots[ins.dst] = (read(ins.arg1) < read(ins.arg2)) ? 1 : 0;
+      }
+      else if (ins.op == "gt")
+      {
+        slots[ins.dst] = (read(ins.arg1) > read(ins.arg2)) ? 1 : 0;
+      }
+      else if (ins.op == "le")
+      {
+        slots[ins.dst] = (read(ins.arg1) <= read(ins.arg2)) ? 1 : 0;
+      }
+      else if (ins.op == "ge")
+      {
+        slots[ins.dst] = (read(ins.arg1) >= read(ins.arg2)) ? 1 : 0;
+      }
+      else if (ins.op == "eq")
+      {
+        slots[ins.dst] = (read(ins.arg1) == read(ins.arg2)) ? 1 : 0;
+      }
+      else if (ins.op == "ne")
+      {
+        slots[ins.dst] = (read(ins.arg1) != read(ins.arg2)) ? 1 : 0;
       }
       else if (ins.op == "jmp")
       {

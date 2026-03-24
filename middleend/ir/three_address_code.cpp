@@ -161,6 +161,30 @@ namespace fusionc::middleend::ir
           {
             op = "div";
           }
+          else if (expr.value == "<")
+          {
+            op = "lt";
+          }
+          else if (expr.value == ">")
+          {
+            op = "gt";
+          }
+          else if (expr.value == "<=")
+          {
+            op = "le";
+          }
+          else if (expr.value == ">=")
+          {
+            op = "ge";
+          }
+          else if (expr.value == "==")
+          {
+            op = "eq";
+          }
+          else if (expr.value == "!=")
+          {
+            op = "ne";
+          }
           else
           {
             throw std::runtime_error("Unsupported binary operator: " + expr.value);
