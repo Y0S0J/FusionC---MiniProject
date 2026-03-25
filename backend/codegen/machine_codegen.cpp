@@ -1,7 +1,7 @@
-// Executes the TAC program produced by the middle-end.
 #include "machine_codegen.h"
-
+#include <iostream>
 #include <unordered_map>
+#include <stdexcept>
 
 namespace fusionc::backend::codegen
 {
@@ -9,7 +9,18 @@ namespace fusionc::backend::codegen
   ExecutionResult execute(const middleend::ir::Program &program)
   {
     std::unordered_map<std::string, int> slots;
+    std::unordered_map<std::string, std::size_t> labels;
+
     ExecutionResult result;
+
+    // First pass: collect labels
+    for (std::size_t i = 0; i < program.size(); ++i)
+    {
+      if (program[i].op == "label")
+      {
+        labels[program[i].dst] = i;
+      }
+    }
 
     auto read = [&](const std::string &name) -> int
     {
@@ -18,12 +29,19 @@ namespace fusionc::backend::codegen
       {
         return it->second;
       }
-      return std::stoi(name); // fall back to literal
+      return std::stoi(name);
     };
 
-    for (const auto &ins : program)
+    // Execution with program counter
+    for (std::size_t pc = 0; pc < program.size(); ++pc)
     {
-      if (ins.op == "const")
+      const auto &ins = program[pc];
+
+      if (ins.op == "label")
+      {
+        continue;
+      }
+      else if (ins.op == "const")
       {
         slots[ins.dst] = std::stoi(ins.arg1);
       }
@@ -47,6 +65,54 @@ namespace fusionc::backend::codegen
       {
         slots[ins.dst] = read(ins.arg1) / read(ins.arg2);
       }
+      else if (ins.op == "jmp")
+      {
+        pc = labels.at(ins.dst) - 1;
+      }
+      else if (ins.op == "jz")
+      {
+        if (read(ins.arg1) == 0)
+        {
+          pc = labels.at(ins.dst) - 1;
+        }
+      }
+      else if (ins.op == "print")
+      {
+        if (ins.arg1.empty())
+        {
+          std::cout << ins.dst;
+          if (!ins.dst.empty() && ins.dst.back() != '\n')
+          {
+            std::cout << std::endl;
+          }
+        }
+        else
+        {
+          // Simple %d replacement
+          std::string format = ins.dst;
+          size_t pos = format.find("%d");
+          if (pos != std::string::npos)
+          {
+            std::cout << format.substr(0, pos) << read(ins.arg1) << format.substr(pos + 2);
+          }
+          else
+          {
+            std::cout << format << read(ins.arg1);
+          }
+          if (format.find('\n') == std::string::npos)
+          {
+            std::cout << std::endl;
+          }
+        }
+      }
+      else if (ins.op == "print_var")
+      {
+        std::cout << read(ins.dst) << std::endl;
+      }
+      else if (ins.op == "scan")
+      {
+        std::cin >> slots[ins.dst];
+      }
       else if (ins.op == "ret")
       {
         result.ok = true;
@@ -54,11 +120,15 @@ namespace fusionc::backend::codegen
         result.message = "Program executed";
         return result;
       }
+      else
+      {
+        throw std::runtime_error("Unknown instruction: " + ins.op);
+      }
     }
 
     result.ok = true;
-    result.message = "Program executed without explicit return; exit code 0";
     result.exitCode = 0;
+    result.message = "Program executed without explicit return";
     return result;
   }
 

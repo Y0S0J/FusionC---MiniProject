@@ -35,6 +35,14 @@ namespace fusionc::frontend::parser
         return "Return";
       case AstNodeKind::ExpressionStatement:
         return "ExpressionStatement";
+      case AstNodeKind::WhileStatement:
+        return "WhileStatement";
+      case AstNodeKind::Printf:
+        return "Printf";
+      case AstNodeKind::Scanf:
+        return "Scanf";
+      case AstNodeKind::Print:
+        return "Print";
       default:
         return "Unknown";
       }
@@ -89,22 +97,45 @@ namespace fusionc::frontend::parser
 
   std::unique_ptr<AstNode> Parser::parseFunction()
   {
-    if (!check(lexer::TokenType::Keyword))
-    {
-      addError("Expected return type before function name.");
-      return nullptr;
-    }
+    std::string returnType;
+    std::string functionName;
 
-    const auto returnType = advance();
-    if (!match(lexer::TokenType::Identifier))
+    // CustomLang style: fn main() { ... }
+    if (match(lexer::TokenType::Keyword, "fn"))
     {
-      addError("Expected function name after return type.");
+      returnType = "int"; // default return type for now
+
+      if (!match(lexer::TokenType::Identifier))
+      {
+        addError("Expected function name after 'fn'.");
+        return nullptr;
+      }
+
+      functionName = previous().lexeme;
+    }
+    // C style: int main() { ... }
+    else if (check(lexer::TokenType::Keyword))
+    {
+      const auto typeToken = advance();
+      returnType = typeToken.lexeme;
+
+      if (!match(lexer::TokenType::Identifier))
+      {
+        addError("Expected function name after return type.");
+        return nullptr;
+      }
+
+      functionName = previous().lexeme;
+    }
+    else
+    {
+      addError("Expected function declaration.");
       return nullptr;
     }
 
     auto func = std::make_unique<AstNode>();
     func->kind = AstNodeKind::Function;
-    func->value = previous().lexeme + ":" + returnType.lexeme;
+    func->value = functionName + ":" + returnType;
 
     if (!match(lexer::TokenType::Punctuation, "("))
     {
@@ -161,12 +192,68 @@ namespace fusionc::frontend::parser
 
     return block;
   }
+  
 
   std::unique_ptr<AstNode> Parser::parseStatement()
   {
     if (match(lexer::TokenType::Punctuation, "{"))
     {
       return parseBlock();
+    }
+    if (match(lexer::TokenType::Keyword, "printf"))
+    {
+    return parsePrintf();
+    }
+    if (match(lexer::TokenType::Keyword, "scanf"))
+    {
+    return parseScanf();
+    }
+    if (match(lexer::TokenType::Keyword, "print"))
+    {
+    return parsePrint();
+    }
+
+    if (match(lexer::TokenType::Keyword, "while"))
+    {
+      auto whileNode = std::make_unique<AstNode>();
+      whileNode->kind = AstNodeKind::WhileStatement;
+      whileNode->value = "while";
+
+      if (!match(lexer::TokenType::Punctuation, "("))
+      {
+        addError("Expected '(' after while.");
+        return nullptr;
+      }
+
+      auto condition = parseExpression();
+      if (!condition)
+      {
+        addError("Expected condition in while statement.");
+        return nullptr;
+      }
+
+      if (!match(lexer::TokenType::Punctuation, ")"))
+      {
+        addError("Expected ')' after while condition.");
+        return nullptr;
+      }
+
+      if (!match(lexer::TokenType::Punctuation, "{"))
+      {
+        addError("Expected '{' to start while body.");
+        return nullptr;
+      }
+
+      auto body = parseBlock();
+      if (!body)
+      {
+        addError("Invalid while body.");
+        return nullptr;
+      }
+
+      whileNode->children.push_back(std::move(condition));
+      whileNode->children.push_back(std::move(body));
+      return whileNode;
     }
 
     if (match(lexer::TokenType::Keyword, "return"))
@@ -206,6 +293,145 @@ namespace fusionc::frontend::parser
     statement->value = "stmt";
     statement->children.push_back(std::move(parsed));
     return statement;
+  }
+
+  std::unique_ptr<AstNode> Parser::parsePrintf()
+  {
+    auto printfNode = std::make_unique<AstNode>();
+    printfNode->kind = AstNodeKind::Printf;
+    printfNode->value = "printf";
+
+    if (!match(lexer::TokenType::Punctuation, "("))
+    {
+      addError("Expected '(' after printf.");
+      return nullptr;
+    }
+
+    if (!match(lexer::TokenType::StringLiteral))
+    {
+      addError("Expected string literal in printf.");
+      return nullptr;
+    }
+
+    auto stringLit = std::make_unique<AstNode>();
+    stringLit->kind = AstNodeKind::Literal;
+    stringLit->value = previous().lexeme;
+    printfNode->children.push_back(std::move(stringLit));
+
+    // Optional additional arguments
+    while (match(lexer::TokenType::Punctuation, ","))
+    {
+      auto expr = parseExpression();
+      if (!expr)
+      {
+        addError("Expected expression in printf arguments.");
+        return nullptr;
+      }
+      printfNode->children.push_back(std::move(expr));
+    }
+
+    if (!match(lexer::TokenType::Punctuation, ")"))
+    {
+      addError("Expected ')' after printf arguments.");
+      return nullptr;
+    }
+
+    if (!match(lexer::TokenType::Punctuation, ";"))
+    {
+      addError("Expected ';' after printf statement.");
+      return nullptr;
+    }
+
+    return printfNode;
+  }
+
+  std::unique_ptr<AstNode> Parser::parseScanf()
+  {
+    auto scanfNode = std::make_unique<AstNode>();
+    scanfNode->kind = AstNodeKind::Scanf;
+    scanfNode->value = "scanf";
+
+    if (!match(lexer::TokenType::Punctuation, "("))
+    {
+      addError("Expected '(' after scanf.");
+      return nullptr;
+    }
+
+    if (!match(lexer::TokenType::StringLiteral))
+    {
+      addError("Expected format string in scanf.");
+      return nullptr;
+    }
+
+    auto formatLit = std::make_unique<AstNode>();
+    formatLit->kind = AstNodeKind::Literal;
+    formatLit->value = previous().lexeme;
+    scanfNode->children.push_back(std::move(formatLit));
+
+    if (!match(lexer::TokenType::Punctuation, ","))
+    {
+      addError("Expected ',' after format string in scanf.");
+      return nullptr;
+    }
+
+    if (!match(lexer::TokenType::Identifier))
+    {
+      addError("Expected identifier in scanf.");
+      return nullptr;
+    }
+
+    auto varNode = std::make_unique<AstNode>();
+    varNode->kind = AstNodeKind::Identifier;
+    varNode->value = previous().lexeme;
+    scanfNode->children.push_back(std::move(varNode));
+
+    if (!match(lexer::TokenType::Punctuation, ")"))
+    {
+      addError("Expected ')' after scanf arguments.");
+      return nullptr;
+    }
+
+    if (!match(lexer::TokenType::Punctuation, ";"))
+    {
+      addError("Expected ';' after scanf statement.");
+      return nullptr;
+    }
+
+    return scanfNode;
+  }
+
+  std::unique_ptr<AstNode> Parser::parsePrint()
+  {
+    auto printNode = std::make_unique<AstNode>();
+    printNode->kind = AstNodeKind::Print;
+    printNode->value = "print";
+
+    if (check(lexer::TokenType::StringLiteral))
+    {
+      advance();
+      auto stringLit = std::make_unique<AstNode>();
+      stringLit->kind = AstNodeKind::Literal;
+      stringLit->value = previous().lexeme;
+      printNode->children.push_back(std::move(stringLit));
+    }
+    else
+    {
+      auto expr = parseExpression();
+      if (!expr)
+      {
+        addError("Expected string or expression in print statement.");
+        return nullptr;
+      }
+      printNode->children.push_back(std::move(expr));
+    }
+
+    if (!match(lexer::TokenType::Punctuation, ";"))
+    {
+      addError("Expected ';' after print statement.");
+      return nullptr;
+    }
+
+    return printNode;
   }
 
   std::unique_ptr<AstNode> Parser::parseDeclarationOrAssignment()
