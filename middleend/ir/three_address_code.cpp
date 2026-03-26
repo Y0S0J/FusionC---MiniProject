@@ -104,6 +104,57 @@ namespace fusionc::middleend::ir
           prog.push_back(Instruction{"jmp", startLabel, "", ""});
           prog.push_back(Instruction{"label", endLabel, "", ""});
         }
+        else if (stmt.kind == AstNodeKind::Printf)
+        {
+          if (!stmt.children.empty())
+          {
+            std::string format = stmt.children[0]->value;
+            if (format.size() >= 2 && format.front() == '"' && format.back() == '"')
+            {
+              format = format.substr(1, format.size() - 2);
+            }
+
+            if (stmt.children.size() == 1)
+            {
+              prog.push_back(Instruction{"print", format, "", ""});
+            }
+            else if (stmt.children.size() == 2)
+            {
+              std::string arg = emitExpr(*stmt.children[1], prog);
+              prog.push_back(Instruction{"print", format, arg, ""});
+            }
+            // For more args, could extend, but for now assume 0 or 1 arg
+          }
+        }
+        else if (stmt.kind == AstNodeKind::Scanf)
+        {
+          if (stmt.children.size() >= 2)
+          {
+            std::string var = stmt.children[1]->value;
+            prog.push_back(Instruction{"scan", var, "", ""});
+          }
+        }
+        else if (stmt.kind == AstNodeKind::Print)
+        {
+          if (!stmt.children.empty())
+          {
+            const auto &child = *stmt.children[0];
+            if (child.kind == AstNodeKind::Literal)
+            {
+              std::string text = child.value;
+              if (text.size() >= 2 && text.front() == '"' && text.back() == '"')
+              {
+                text = text.substr(1, text.size() - 2);
+              }
+              prog.push_back(Instruction{"print", text, "", ""});
+            }
+            else
+            {
+              std::string value = emitExpr(child, prog);
+              prog.push_back(Instruction{"print_var", value, "", ""});
+            }
+          }
+        }
       }
 
       std::string emitExpr(const frontend::parser::AstNode &expr, Program &prog)
