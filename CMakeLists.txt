@@ -16,6 +16,8 @@ add_executable(fusionc
 	middleend/ir/three_address_code.cpp
 	middleend/optimizer/optimizer.cpp
 	backend/codegen/machine_codegen.cpp
+	ai_module/ai_client.cpp
+	ai_module/error_handler.cpp
 )
 
 target_include_directories(fusionc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

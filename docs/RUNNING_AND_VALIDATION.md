@@ -25,17 +25,16 @@ int main() {
 
 ### Supported custom subset (current behavior)
 - Similar statement model to above.
-- Working function header shape in current implementation: `let main() { ... }`
-- Provided sample using `fn main()` currently fails semantic return-type check.
+- Supports `fn main() { ... }` in current implementation.
+- Supports `let` declarations and `print` statements in provided custom tests.
 
-Working custom example in current implementation:
+Working custom examples in current implementation:
 
 ```text
-let main() {
-  let x = 10;
-  let y = x + 5;
-  y = y * 2;
-  return y;
+fn main() {
+  let y = 20;
+  print y;
+  return 0;
 }
 ```
 
@@ -91,34 +90,61 @@ What success looks like:
 - "Compilation pipeline completed successfully."
 - "Program exit code: 30"
 
-### Run custom sample from repo (current known failure)
+### Run custom sample from repo
 
 ```powershell
 .\build-win\Debug\fusionc.exe tests\test_custom\sample.fsc custom --dump-tokens --dump-ast
 ```
 
 Current expected output:
-- Error: return type mismatch (`fn` vs `let`)
+- Compilation pipeline success.
+- Program output `30`.
+- Program exit code `0`.
 
-### Run working custom form (temporary file example)
+### Validate AI-assisted syntax diagnostics (new)
+
+Create a small file with a syntax error:
 
 ```powershell
-$tmp = Join-Path $env:TEMP 'fusionc_custom_workaround.fsc'
+$tmp = Join-Path $env:TEMP 'fusionc_ai_error_demo.c'
 @'
-let main() {
-  let x = 10;
-  let y = x + 5;
-  y = y * 2;
-  return y;
+int main() {
+  int x = 1
+  return x;
 }
 '@ | Set-Content -Path $tmp -Encoding ascii
-.\build-win\Debug\fusionc.exe $tmp custom --dump-tokens --dump-ast
+```
+
+Run normally (AI enabled by default):
+
+```powershell
+.\build-win\Debug\fusionc.exe $tmp c
+```
+
+Expected behavior:
+- Error output should include `Syntax error: ...` plus `Why:` and `Suggestion:` lines.
+
+Validate fallback mode (AI disabled):
+
+```powershell
+$env:FUSIONC_DISABLE_AI='1'
+.\build-win\Debug\fusionc.exe $tmp c
+Remove-Item Env:FUSIONC_DISABLE_AI
+```
+
+Expected behavior:
+- Error output should fall back to the original compiler message without AI explanation fields.
+
+### Run custom print samples from repo
+
+```powershell
+.\build-win\Debug\fusionc.exe tests\test_custom\print.fsc custom --dump-tokens --dump-ast
+.\build-win\Debug\fusionc.exe tests\test_custom\print_var.fsc custom --dump-tokens --dump-ast
 ```
 
 What it does:
-- Writes a temporary custom file
-- Runs compiler with `custom` hint
-- Should complete successfully with exit code `30`
+- Validates integer and string print paths in CustomLang.
+- Confirms the current bundled custom tests execute successfully.
 
 ## 4) How to Check if Compiler is Working Correctly
 
@@ -132,6 +158,9 @@ Use this quick checklist:
    - `Function(main:int)`
    - `Declaration`, `Assignment`, `Return`
 5. No semantic errors for valid C sample.
+6. AI syntax diagnostics appear for malformed input (`Why` and `Suggestion` present).
+7. Fallback mode (`FUSIONC_DISABLE_AI=1`) returns raw compiler diagnostics.
+8. Custom samples (`sample.fsc`, `print.fsc`, `print_var.fsc`) run successfully with both explicit `custom` hint and auto-detection.
 
 Optional negative tests:
 - Use undeclared variable and verify semantic error appears.
@@ -157,6 +186,13 @@ cmake --build build-win --config Debug
 ```
 
 If both pass and exit code remains stable, your change likely did not break the main path.
+
+If you touched diagnostics/AI behavior, also run:
+
+```powershell
+.\build-win\Debug\fusionc.exe $tmp c
+$env:FUSIONC_DISABLE_AI='1'; .\build-win\Debug\fusionc.exe $tmp c; Remove-Item Env:FUSIONC_DISABLE_AI
+```
 
 ## 7) Common CLI Patterns You Can Reuse
 

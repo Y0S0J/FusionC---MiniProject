@@ -656,7 +656,8 @@ namespace fusionc::frontend::parser
 
   void Parser::addError(const std::string &message)
   {
-    errors_.push_back(message);
+    const auto& token = isAtEnd() ? previous() : peek();
+    errors_.push_back("[Line " + std::to_string(token.line) + "] " + message);
   }
 
   std::string astToString(const AstNode &node, int indent)

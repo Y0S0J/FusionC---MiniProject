@@ -105,7 +105,36 @@ Interpretation:
 
 ---
 
-### Stage C: Semantic Analysis
+### Stage C: AI-Assisted Syntax Error Handling
+
+Theory:
+- When syntax diagnostics are produced, an NLP-style helper can translate terse compiler errors into beginner-friendly explanations and likely fixes.
+- If AI is unavailable, the compiler should still return standard diagnostics.
+
+Your code:
+- `ai_module/ai_client.cpp`
+- `ai_module/error_handler.cpp`
+- Wired in `core/compiler_controller.cpp`
+
+What happens in current implementation:
+- Parser and lexer errors are collected first.
+- If errors exist before semantic analysis, the controller invokes `ErrorHandler`.
+- Syntax diagnostics are transformed to include:
+  - `Why:` explanation
+  - `Suggestion:` corrective action
+- If `FUSIONC_DISABLE_AI=1`, the same errors are passed through unchanged.
+
+Example transformed error shape:
+
+```text
+Syntax error: Expected ';' at end of statement.
+    Why: The statement is incomplete because the parser reached the end of a statement without a semicolon.
+    Suggestion: Add ';' at the end of the statement, usually after an expression, declaration, or function call.
+```
+
+---
+
+### Stage D: Semantic Analysis
 
 Theory:
 - Validates meaning beyond syntax: scope, undeclared variables, duplicate declarations, type checks.
@@ -125,7 +154,7 @@ For this C sample:
 
 ---
 
-### Stage D: Intermediate Representation (TAC)
+### Stage E: Intermediate Representation (TAC)
 
 Theory:
 - Lowers AST into simple instructions (three-address code) that are easy to optimize and execute.
@@ -149,7 +178,7 @@ Interpretation:
 
 ---
 
-### Stage E: Optimization (Constant Folding)
+### Stage F: Optimization (Constant Folding)
 
 Theory:
 - Rewrites expressions at compile time when values are known constants.
@@ -176,7 +205,7 @@ ret y
 
 ---
 
-### Stage F: Backend Execution (Current "Codegen")
+### Stage G: Backend Execution (Current "Codegen")
 
 Theory:
 - Final stage usually emits machine code/object code.
@@ -214,41 +243,19 @@ Short summary:
 
 ---
 
-## 4) Current Custom Language Status (Important)
+## 4) Current Custom Language Status
 
-You have 2 custom-language forms in repo context:
+Current validation status with the project binary:
 
-1. `tests/test_custom/sample.fsc` uses `fn main() { ... }`
-2. A currently working form is `let main() { ... }`
+1. `tests/test_custom/sample.fsc` compiles and runs with `fn main() { ... }`.
+2. `tests/test_custom/print.fsc` compiles and runs, printing integer output.
+3. `tests/test_custom/print_var.fsc` compiles and runs, printing string + variable output.
+4. Both explicit `custom` hint and extension-based auto-detection work for these files.
 
-### Why `fn main()` currently fails
-
-Observed error:
-
-```text
-Return type mismatch. Expected 'fn' but got 'let'.
-```
-
-Reason in current design:
-- Parser stores function metadata as `Function(name:returnTypeToken)`.
-- In custom input, `fn` is treated like return type token.
-- Semantic analyzer expects returned expression type to match that token.
-- Declarations and variable expressions resolve as `let`, so returning a `let` variable mismatches expected `fn`.
-
-### Working custom workaround right now
-
-Use:
-
-```text
-let main() {
-  let x = 10;
-  let y = x + 5;
-  y = y * 2;
-  return y;
-}
-```
-
-This shape compiles and executes in current code (exit code `30`).
+Observed runtime behavior:
+- `sample.fsc` prints `30` and exits with code `0`.
+- `print.fsc` prints `20` and exits with code `0`.
+- `print_var.fsc` prints `The answer is:` then `42`, and exits with code `0`.
 
 ---
 
@@ -270,11 +277,10 @@ This shape compiles and executes in current code (exit code `30`).
 ## 6) If You Want to Grow This Toward a Full Compiler
 
 Suggested order:
-1. Fix custom function model (`fn` as function keyword, not return type).
-2. Add control flow (`if`, `while`) to parser + IR with labels/jumps.
-3. Add function parameters and calls.
-4. Expand type system and conversions.
-5. Replace interpreter backend with assembly/LLVM emission.
-6. Add stage-wise tests (lexer/parser/semantic/IR/optimizer/backend).
+1. Add control flow (`if`, `while`) to parser + IR with labels/jumps.
+2. Add function parameters and calls.
+3. Expand type system and conversions.
+4. Replace interpreter backend with assembly/LLVM emission.
+5. Add stage-wise tests (lexer/parser/semantic/IR/optimizer/backend).
 
 This order gives fast learning and visible progress.

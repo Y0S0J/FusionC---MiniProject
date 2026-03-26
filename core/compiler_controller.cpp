@@ -7,6 +7,7 @@
 #include <cctype>
 
 #include "language_loader.h"
+#include "../ai_module/error_handler.h"
 #include "../frontend/semantic/symbol_table.h"
 #include "../middleend/ir/ir.h"
 #include "../middleend/optimizer/optimizer.h"
@@ -14,6 +15,20 @@
 
 namespace fusionc::core
 {
+
+  namespace
+  {
+    void applyUserFriendlySyntaxErrors(CompilationResult &result, const std::string &sourceCode)
+    {
+      if (result.errors.empty())
+      {
+        return;
+      }
+
+      const ai::ErrorHandler errorHandler;
+      result.errors = errorHandler.buildUserFriendlyErrors(result.errors, sourceCode);
+    }
+  } // namespace
 
   CompilationResult CompilerController::compileToParser(const std::string &inputPath, const CompilationOptions &options) const
   {
@@ -74,6 +89,7 @@ namespace fusionc::core
 
     if (!result.errors.empty())
     {
+      applyUserFriendlySyntaxErrors(result, source);
       return result;
     }
 
