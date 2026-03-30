@@ -16,4 +16,4 @@ $Prompt = 'ollama run llama3:8b-instruct-q4_K_M "You are an expert compiler assi
 $env:FUSIONC_LLM_CMD_TEMPLATE = $Prompt
 
 Write-Host "Running FusionC on $File with AI assistance..."
-.\build-win\Release\fusionc.exe $File $Language
+.\build-win\Debug\fusionc.exe $File $Language

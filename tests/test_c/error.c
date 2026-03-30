@@ -1,6 +1,6 @@
 int main()
 {
-  ints y = x + 5;
-  int x = 10
-  return y;
+  int y =  5;
+  int x = y+10
+  return x;
 }

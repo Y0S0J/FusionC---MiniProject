@@ -43,8 +43,6 @@ namespace fusionc::frontend::parser
         return "Printf";
       case AstNodeKind::Scanf:
         return "Scanf";
-      case AstNodeKind::Print:
-        return "Print";
       default:
         return "Unknown";
       }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <unordered_set>
 
 namespace fusionc::ai
 {
@@ -15,6 +16,19 @@ namespace fusionc::ai
                      { return static_cast<char>(std::tolower(c)); });
       return text;
     }
+
+    std::string extractSuggestion(const std::string& explanation)
+    {
+      const std::string kw = "Suggestion:";
+      size_t pos = explanation.find(kw);
+      if (pos == std::string::npos) return "";
+
+      std::string suggestion = explanation.substr(pos + kw.length());
+      size_t first = suggestion.find_first_not_of(" \t\r\n");
+      if (std::string::npos == first) return "";
+      size_t last = suggestion.find_last_not_of(" \t\r\n");
+      return suggestion.substr(first, (last - first + 1));
+    }
   } // namespace
 
   ErrorHandler::ErrorHandler(AIClient client)
@@ -26,6 +40,7 @@ namespace fusionc::ai
   {
     std::vector<std::string> transformed;
     transformed.reserve(compilerErrors.size());
+    std::unordered_set<std::string> seenSuggestions;
 
     for (const auto &error : compilerErrors)
     {
@@ -46,10 +61,23 @@ namespace fusionc::ai
       if (insight->suggestion.empty())
       {
         // Command-based LLM: emit only the model output.
+        std::string parsedSuggestion = extractSuggestion(insight->explanation);
+        if (!parsedSuggestion.empty())
+        {
+          if (seenSuggestions.find(parsedSuggestion) != seenSuggestions.end()) continue;
+          seenSuggestions.insert(parsedSuggestion);
+        }
+        else
+        {
+          if (seenSuggestions.find(insight->explanation) != seenSuggestions.end()) continue;
+          seenSuggestions.insert(insight->explanation);
+        }
         transformed.push_back(insight->explanation);
       }
       else
       {
+        if (seenSuggestions.find(insight->suggestion) != seenSuggestions.end()) continue;
+        seenSuggestions.insert(insight->suggestion);
         transformed.push_back("Syntax error: " + error + "\n    Why: " + insight->explanation + "\n    Suggestion: " + insight->suggestion);
       }
     }
